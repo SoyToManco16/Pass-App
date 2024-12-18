@@ -17,19 +17,19 @@ import os
 # Inicializar colorama
 init()
 
+# Función para limpar la pantalla
 def clean():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-print("Desarrollado por SoyToManco16 y ChatGPT xD") 
-print("Generador y encriptador de contraseñas")
-print(" ")
+
 def mostrar_menu():
     print(Fore.LIGHTBLUE_EX + "--- PASS APP ---" + Fore.RESET)
     print(Fore.LIGHTBLACK_EX + "1) Generar contraseña")
     print("2) Encriptar contraseña")
     print("3) Hashear contraseña")
     print("4) Desencriptar contraseña")
-    print("5) Historial de contraseñas")
+    print("5) Verificar integridad de las contraseñas")
+    print("6) Historial de contraseñas")
     print("q) Salir" + Fore.RESET)
     print(" ")
 
@@ -258,20 +258,14 @@ def decrypt(): # Opción 4
     clean()
     print("Usted ha seleccionado descifrar contraseñas")
     print("A) Cifrado simétrico")
-    print("B) Cifrado asimétrico")
-    print("C) Cifrado de contraseñas")
-    print("D) Hashes")
+    print("B) Cifrado RSA")
 
     ans = str(input("Seleccione que desea descifrar: ")).upper()
 
     if ans == "A":
         decryptsim()
     elif ans == "B":
-        decryptasim()
-    elif ans == "C":
-        decryptpass()
-    elif ans == "D":
-        decrypthash()
+        decryptRSA()
     else:
         print("Esta opción no es válida")
         return
@@ -320,88 +314,100 @@ def decryptsim():
             print(Fore.RED + f"Ocurrió un error inesperado: {err}" + Fore.RESET)
 
 
-def decryptasim():
-    print("Descifrado asimétrico")
-    print("A) RSA")
-    print("B) Verificación ED25519 (SSH)")
+def decryptRSA():
+    print("Descifrado RSA")
 
-    read = str(input("Seleccione una opción: ")).upper()
-    if read == "A":
-        try: # Leer la clave privada de el archivo generado
-            with open("pvkey.pem", "rb") as pvfile:
-                pvkey = pvfile.read()
+    try: # Leer la clave privada de el archivo generado
+        with open("pvkey.pem", "rb") as pvfile:
+            pvkey = pvfile.read()
 
-            ans = str(input("¿La clave privada está cifrada con una contraseña? (s/n): ")).upper()
-            if ans == "S":
-                pwd = str(input("Introduzca la contraseña para descifrar el mensaje: "))
-                pvkey = serialization.load_pem_private_key(pvkey, password=pwd, backend=default_backend())
-            else:
-                pvkey = serialization.load_pem_private_key(pvkey, password=None, backend=default_backend())
+        ans = str(input("¿La clave privada está cifrada con una contraseña? (s/n): ")).upper()
+        if ans == "S":
+            pwd = str(input("Introduzca la contraseña para descifrar el mensaje: "))
+            pvkey = serialization.load_pem_private_key(pvkey, password=pwd, backend=default_backend())
+        else:
+            pvkey = serialization.load_pem_private_key(pvkey, password=None, backend=default_backend())
             
-            print("Clave privada cargada correctamente")
+        print("Clave privada cargada correctamente")
 
-            # Solicitar texto o contraseña cifrada
-            ciphered = str(input("Introduzca la contraseña (hex): "))
-            cipheredbytes = bytes.fromhex(ciphered)
+        # Solicitar texto o contraseña cifrada
+        ciphered = str(input("Introduzca la contraseña (hex): "))
+        cipheredbytes = bytes.fromhex(ciphered)
 
-            # Descifrar pass o texto
-            unciphered = pvkey.decrypt(
-                cipheredbytes,
-                padding.OAEP(
-                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                    algorithm=hashes.SHA256(),
-                    label=None
-                )
-            )
-            print(Fore.GREEN + f"Contraseña descifrada: {unciphered}" + Fore.RESET)
+        # Descifrar pass o texto
+        unciphered = pvkey.decrypt(
+            cipheredbytes,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None                )
+        )
+        print(Fore.GREEN + f"Contraseña descifrada: {unciphered}" + Fore.RESET)
+    except FileNotFoundError:
+        print(Fore.RED + "Error: No se ha detectado el archivo pvkey.pem")
+    except ValueError:
+        print("Error: La contraseña o el formato del archivo es incorrecto")
+    except InvalidToken:
+        print("Error: La clave privada no corresponde a la contraseña cifrada")
+    except Exception as err:
+        print(f"Ocurrió un error inesperado: {err}" + Fore.RESET)
 
-        except FileNotFoundError:
-            print(Fore.RED + "Error: No se ha detectado el archivo pvkey.pem")
-        except ValueError:
-            print("Error: La contraseña o el formato del archivo es incorrecto")
-        except InvalidToken:
-            print("Error: La clave privada no corresponde a la contraseña cifrada")
-        except Exception as err:
-            print(f"Ocurrió un error inesperado: {err}" + Fore.RESET)
 
-    elif read == "B":
+def integrity():
+    clean()
+    print(Fore.LIGHTBLACK_EX + "Usted ha seleccionado verificar la integridad de sus contraseñas")
+    print("A) Ed25519 (Integridad de el texto firmado)")
+    print("B) bcrypt (Integridad de la contraseña)")
+    print("C) pbkdf2_hmac (Integridad de la contraseña)")
+    print("D) MD5 (Integridad del hash)")
+    print("E) SHA256 (Integridad del hash)" + Fore.RESET)
 
-        # Solicitar firma y convertirla a bytes
-        digitalsignature = str(input("Introduce la firma digital (hex): "))
-        bytessignature = bytes.fromhex(digitalsignature)
+    try:
+        option = str(input("Seleccione que desea verificar: ")).upper()
 
-        # Solicitar clave pública y convertirla a bytes
-        pubkeyhex = str(input("Introduce la clave pública (hex): "))
-        bytespubkey = bytes.fromhex(pubkeyhex)
-        pubkey = ed25519.Ed25519PublicKey.from_public_bytes(bytespubkey)
+        if option == "A":
+            vED25519()
+        elif option == "B":
+            vBCRYPT()
+        elif option == "C":
+            vPBKDF2()
+        elif option == "D":
+            vMD5()
+        elif option == "E":
+            vSHA256()
+        else:
+            print("Opción no válida"); exit()
 
-        # Solicitar la passphrase
-        passphrase = str(input("Introduce el mensaje original para comprobar su integridad: "))
+    except KeyboardInterrupt:
+        print("Saliendo del menú")
 
-        # Verificar la firma con la clave pública
-        try:
-            pubkey.verify(bytessignature, passphrase.encode())
-            print(Fore.GREEN + "La firma es válida, el mensaje no ha sido alterado" + Fore.RESET)
 
-        except ValueError as err:
-            print(Fore.RED +  f"Error de verificación: La firma no es valida o los datos no coinciden. Detalles: {err}" + Fore.RESET)
+def vED25519():
+     # Solicitar firma y convertirla a bytes
+    digitalsignature = str(input("Introduce la firma digital (hex): "))
+    bytessignature = bytes.fromhex(digitalsignature)
 
-        except TypeError as err:
-            print(Fore.RED +  f"Error de tipo de dato: Hubo un problema con los tipos de datos. Detalles {err}" + Fore.RESET)
+    # Solicitar clave pública y convertirla a bytes
+    pubkeyhex = str(input("Introduce la clave pública (hex): "))
+    bytespubkey = bytes.fromhex(pubkeyhex)
+    pubkey = ed25519.Ed25519PublicKey.from_public_bytes(bytespubkey)
+
+    # Solicitar la passphrase
+    passphrase = str(input("Introduce el mensaje original para comprobar su integridad: "))
+
+    # Verificar la firma con la clave pública
+    try:
+        pubkey.verify(bytessignature, passphrase.encode())
+        print(Fore.GREEN + "La firma es válida, el mensaje no ha sido alterado" + Fore.RESET)
+
+    except ValueError as err:
+        print(Fore.RED +  f"Error de verificación: La firma no es valida o los datos no coinciden. Detalles: {err}" + Fore.RESET)
+
+    except TypeError as err:
+        print(Fore.RED +  f"Error de tipo de dato: Hubo un problema con los tipos de datos. Detalles {err}" + Fore.RESET)
         
-        except Exception as err:
-            print(Fore.RED + f"Ocurrió un error inesperado: {err}" + Fore.RESET)
-
-
-def decryptpass():
-    print("Descifrado de contraseñas")
-    print("A) bcrypt")
-    print("B) pbkdf2_hmac")
-
-def decrypthash():
-    print("Descifrar hashes")
-    print("A) MD5")
-    print("B) SHA256")
+    except Exception as err:
+        print(Fore.RED + f"Ocurrió un error inesperado: {err}" + Fore.RESET)
 
 
 
@@ -421,6 +427,8 @@ while True:
         clean(); hashpass(); print(" ")
     elif answer == "4":
         clean(); decrypt(); print(" ")
+    elif answer == "5":
+        clean(); integrity(); print(" ")
     elif answer == "q":
         print("Saliendo del programa, hasta la próxima :)")
         break
